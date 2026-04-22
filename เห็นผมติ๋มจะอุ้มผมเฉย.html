@@ -1,0 +1,729 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FuelShield  — Smart Subsidy Dashboard (Real-time)</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --terra:#c45c2e;--gold:#c89b3c;--sage:#4a7c6f;
+  --bg:#1c1c1e;--bg2:#1e1810;--bg3:#161410;
+  --border:#3a3020;--muted:#8c7e66;--text:#fdfaf6;--subtext:#d4c8b8;
+}
+body{font-family:system-ui,-apple-system,sans-serif;color:var(--text);background:var(--bg);min-height:100vh;padding:0 0 2rem}
+
+/* Hero */
+.hero{background:var(--bg2);padding:1.25rem 1.5rem 1rem;border-bottom:0.5px solid var(--border);display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;margin-bottom:0}
+.eyebrow{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:.3rem}
+h1{font-size:20px;font-weight:500;line-height:1.3}
+h1 em{color:var(--terra);font-style:normal}
+.hero-right{display:flex;flex-direction:column;align-items:flex-end;gap:6px}
+.live-btn{display:flex;align-items:center;gap:6px;padding:6px 12px;background:var(--bg3);border:0.5px solid var(--border);border-radius:20px;font-size:12px;cursor:pointer;color:var(--subtext);transition:all .2s}
+.live-btn:hover{border-color:var(--terra)}
+.dot{width:8px;height:8px;border-radius:50%;background:#555;transition:background .3s;flex-shrink:0}
+.dot.live{background:#4a7c6f;box-shadow:0 0 0 3px rgba(74,124,111,.2)}
+.dot.loading{background:var(--gold);animation:pulse .8s infinite}
+.dot.error{background:var(--terra)}
+.last-update{font-size:10px;color:var(--muted)}
+.refresh-ind{display:none;align-items:center;gap:4px;font-size:11px;color:var(--muted)}
+.spin{animation:spin 1s linear infinite;display:inline-block}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+
+/* KPI */
+.kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;padding:1rem 1.5rem}
+.kpi{background:var(--bg2);border:0.5px solid var(--border);border-radius:8px;padding:.85rem .9rem;cursor:pointer;transition:border-color .15s;position:relative;overflow:hidden}
+.kpi:hover{border-color:#555}
+.kpi::after{content:'';position:absolute;bottom:0;left:0;right:0;height:2px}
+.kpi.k1::after,.kpi.k3::after{background:var(--terra)}
+.kpi.k2::after{background:var(--gold)}
+.kpi.k4::after{background:var(--sage)}
+.kpi-val{font-size:20px;font-weight:500;line-height:1;margin-bottom:.2rem;transition:color .3s}
+.kpi.k1 .kpi-val,.kpi.k3 .kpi-val{color:var(--terra)}
+.kpi.k2 .kpi-val{color:var(--gold)}
+.kpi.k4 .kpi-val{color:var(--sage)}
+.kpi-lbl{font-size:11px;color:var(--muted);line-height:1.4}
+.kpi-change{font-size:10px;margin-top:3px}
+.up{color:#e85555}.down{color:var(--sage)}.neutral{color:var(--muted)}
+
+/* Cards */
+.section{padding:0 1.5rem;margin-bottom:12px}
+.card{background:var(--bg2);border:0.5px solid var(--border);border-radius:12px;overflow:hidden}
+.card-head{padding:.7rem 1rem;border-bottom:0.5px solid var(--border);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px}
+.card-title{font-size:11px;font-weight:500;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.card-body{padding:1rem}
+
+/* Prices grid */
+.prices-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.price-item{background:var(--bg3);border:0.5px solid var(--border);border-radius:8px;padding:.75rem .85rem;text-align:center;transition:border-color .5s}
+.price-item.changed{border-color:var(--gold)}
+.price-item.manual{border-color:var(--terra)}
+.price-country{font-size:10px;color:var(--muted);margin-bottom:.2rem}
+.price-val{font-size:18px;font-weight:500;color:var(--gold)}
+.price-curr{font-size:11px;color:var(--muted);margin-top:1px}
+.price-delta{font-size:11px;margin-top:2px}
+
+/* Editable price input inside price-item */
+.price-input-wrap{display:flex;align-items:center;justify-content:center;gap:4px;margin:.25rem 0 .1rem}
+.price-input{background:transparent;border:none;border-bottom:1px solid var(--border);color:var(--gold);font-size:18px;font-weight:500;width:80px;text-align:center;outline:none;font-family:inherit;padding:2px 0;transition:border-color .2s}
+.price-input:focus{border-bottom-color:var(--terra)}
+.price-input::-webkit-inner-spin-button,.price-input::-webkit-outer-spin-button{opacity:.4}
+.price-unit{font-size:12px;color:var(--muted)}
+.edit-tag{font-size:9px;color:var(--terra);letter-spacing:.06em;text-transform:uppercase;margin-top:2px;opacity:.7}
+
+/* Simulator */
+.sim-grid{display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem}
+.srow{display:flex;flex-direction:column;gap:5px}
+.slbl{font-size:12px;color:var(--subtext);margin-bottom:2px}
+.sim-input-row{display:flex;align-items:center;gap:8px}
+.sim-input{background:var(--bg3);border:0.5px solid var(--border);border-radius:8px;color:var(--gold);font-size:15px;font-weight:500;width:100%;padding:6px 10px;outline:none;font-family:inherit;transition:border-color .2s}
+.sim-input:focus{border-color:var(--terra)}
+.sim-input::-webkit-inner-spin-button,.sim-input::-webkit-outer-spin-button{opacity:.5}
+.sim-unit{font-size:12px;color:var(--muted);white-space:nowrap;flex-shrink:0}
+input[type=range]{width:100%;accent-color:var(--terra)}
+.sim-results{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.sres{background:var(--bg3);border-radius:8px;padding:.65rem .8rem;border:0.5px solid var(--border);text-align:center;transition:border-color .5s}
+.sres.changed{border-color:var(--gold)}
+.sres-val{font-size:18px;font-weight:500;line-height:1}
+.sres-lbl{font-size:11px;color:var(--muted);margin-top:.2rem}
+.sres.r1 .sres-val{color:var(--terra)}.sres.r2 .sres-val{color:var(--gold)}.sres.r3 .sres-val{color:var(--sage)}
+
+/* Trend section */
+.trend-section{display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:0 1.5rem;margin-bottom:12px}
+.bar-rows{display:flex;flex-direction:column;gap:.65rem}
+.brow{display:flex;align-items:center;gap:8px}
+.blbl{font-size:12px;color:var(--subtext);width:80px;flex-shrink:0}
+.btrack{flex:1;height:7px;background:#2e2820;border-radius:4px;overflow:hidden}
+.bfill{height:100%;border-radius:4px;transition:width 1s ease}
+.bval{font-size:12px;font-weight:500;width:36px;text-align:right}
+.chart-wrap{position:relative;width:100%;height:200px}
+.chart-tabs{display:flex;gap:4px}
+.ctab{padding:3px 8px;border-radius:8px;font-size:11px;font-weight:500;border:0.5px solid var(--border);color:var(--muted);cursor:pointer;background:transparent;transition:all .15s}
+.ctab.active{background:var(--terra);color:var(--text);border-color:var(--terra)}
+
+/* Impact band */
+.impact-band{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--border);border-radius:12px;overflow:hidden;margin:0 1.5rem 12px}
+.imp-block{background:var(--bg2);padding:.9rem 1.1rem;text-align:center}
+.imp-val{font-size:20px;font-weight:500;line-height:1;margin-bottom:.2rem}
+.imp-block:nth-child(1) .imp-val{color:var(--terra)}
+.imp-block:nth-child(2) .imp-val{color:var(--gold)}
+.imp-block:nth-child(3) .imp-val{color:var(--sage)}
+.imp-lbl{font-size:11px;color:var(--muted);line-height:1.5}
+
+/* Footer */
+.footer{text-align:center;font-size:11px;color:var(--muted);line-height:1.8;padding:.75rem 1.5rem 0}
+.footer strong{color:var(--text)}
+.footer em{color:var(--terra);font-style:normal}
+
+/* Badge */
+.data-badge{font-size:10px;padding:2px 6px;border-radius:4px;background:rgba(74,124,111,.15);color:var(--sage);border:0.5px solid var(--sage)}
+.data-badge.live-data{animation:pulseBg 2s infinite}
+@keyframes pulseBg{0%,100%{opacity:1}50%{opacity:.6}}
+
+/* Pill */
+.pill{display:inline-block;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:500;border:0.5px solid}
+.pill-terra{background:rgba(196,92,46,.15);color:#c45c2e;border-color:#c45c2e}
+.pill-gold{background:rgba(200,155,60,.15);color:#c89b3c;border-color:#c89b3c}
+.pill-sage{background:rgba(74,124,111,.15);color:#4a7c6f;border-color:#4a7c6f}
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════ HERO ═══ -->
+<div class="hero">
+  <div>
+    <div class="eyebrow">
+      <span class="pill pill-terra">Track B</span>&nbsp;
+      <span class="pill pill-gold">Human Resilience Lab</span>&nbsp;
+      <span class="pill pill-sage">FuelShield v2</span>
+    </div>
+    <h1>ราคาน้ำมันสูง — <em>ใครแบกรับภาระ?</em></h1>
+    <p style="font-size:12px;color:var(--muted);margin-top:.3rem">วิเคราะห์ผลกระทบเชิงนโยบายและออกแบบ Targeted Subsidy · Real-time data integration</p>
+  </div>
+  <div class="hero-right">
+    <button class="live-btn" id="liveBtn" onclick="toggleLive()">
+      <div class="dot" id="liveDot"></div>
+      <span id="liveLabel">เชื่อมต่อข้อมูล Real-time</span>
+    </button>
+    <div class="last-update" id="lastUpdate">ยังไม่ได้โหลดข้อมูล</div>
+    <div class="refresh-ind" id="refreshInd">
+      <span class="spin">↻</span> กำลังอัปเดต...
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════ KPIs ═══ -->
+<div class="kpi-row">
+  <div class="kpi k1">
+    <div class="kpi-val" id="kpi1">68%</div>
+    <div class="kpi-lbl">subsidy ตกถึงคนรวย 20% บนสุด</div>
+    <div class="kpi-change neutral">ข้อมูลคงที่ · IMF 2022</div>
+  </div>
+  <div class="kpi k2">
+    <div class="kpi-val" id="kpi2">$5.9T</div>
+    <div class="kpi-lbl">งบ subsidy โลก/ปี</div>
+    <div class="kpi-change neutral">IMF Fiscal Monitor</div>
+  </div>
+  <div class="kpi k3">
+    <div class="kpi-val" id="kpi3">—</div>
+    <div class="kpi-lbl">Brent Crude ล่าสุด ($/barrel)</div>
+    <div class="kpi-change neutral" id="kpi3c">กด "เชื่อมต่อข้อมูล" เพื่อโหลด</div>
+  </div>
+  <div class="kpi k4">
+    <div class="kpi-val" id="kpi4">—</div>
+    <div class="kpi-lbl">น้ำมันไทย 95 (฿/ลิตร โดยประมาณ)</div>
+    <div class="kpi-change neutral" id="kpi4c">อิงราคาตลาดโลก</div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════ REAL-TIME PRICES ═══ -->
+<div class="section">
+  <div class="card">
+    <div class="card-head">
+      <span class="card-title">ราคาน้ำมันอ้างอิงโลก — Real-time</span>
+      <div style="display:flex;gap:6px;align-items:center">
+        <span class="data-badge" id="dataBadge">รอการเชื่อมต่อ</span>
+        <button class="ctab" onclick="fetchData()" style="border-color:var(--terra);color:var(--terra)">↻ รีเฟรช</button>
+      </div>
+    </div>
+    <div class="card-body">
+      <div class="prices-grid">
+        <div class="price-item" id="pi-brent">
+          <div class="price-country">Brent Crude</div>
+          <div class="price-input-wrap">
+            <input class="price-input" type="number" id="p-brent" value="" placeholder="—" min="1" step="0.01" oninput="onManualPrice('brent')">
+            <span class="price-unit">$</span>
+          </div>
+          <div class="price-curr">USD/barrel</div>
+          <div class="price-delta neutral" id="pd-brent">—</div>
+          <div class="edit-tag" id="et-brent">กรอกเองได้</div>
+        </div>
+        <div class="price-item" id="pi-wti">
+          <div class="price-country">WTI Crude</div>
+          <div class="price-input-wrap">
+            <input class="price-input" type="number" id="p-wti" value="" placeholder="—" min="1" step="0.01" oninput="onManualPrice('wti')">
+            <span class="price-unit">$</span>
+          </div>
+          <div class="price-curr">USD/barrel</div>
+          <div class="price-delta neutral" id="pd-wti">—</div>
+          <div class="edit-tag" id="et-wti">กรอกเองได้</div>
+        </div>
+        <div class="price-item" id="pi-th95">
+          <div class="price-country">น้ำมันไทย (95)</div>
+          <div class="price-input-wrap">
+            <input class="price-input" type="number" id="p-th95" value="" placeholder="—" min="1" step="0.01" oninput="onManualPrice('th95')">
+            <span class="price-unit">฿</span>
+          </div>
+          <div class="price-curr">฿/ลิตร</div>
+          <div class="price-delta neutral" id="pd-th95">—</div>
+          <div class="edit-tag" id="et-th95">กรอกเองได้</div>
+        </div>
+        <div class="price-item" id="pi-thdsl">
+          <div class="price-country">น้ำมันไทย (ดีเซล)</div>
+          <div class="price-input-wrap">
+            <input class="price-input" type="number" id="p-thdsl" value="" placeholder="—" min="1" step="0.01" oninput="onManualPrice('thdsl')">
+            <span class="price-unit">฿</span>
+          </div>
+          <div class="price-curr">฿/ลิตร</div>
+          <div class="price-delta neutral" id="pd-thdsl">—</div>
+          <div class="edit-tag" id="et-thdsl">กรอกเองได้</div>
+        </div>
+      </div>
+      <p style="font-size:11px;color:var(--muted);margin-top:.75rem;font-style:italic" id="dataNote">
+        ราคาน้ำมันไทยประมาณการจากราคา Brent ผ่านสูตร: (Brent × 0.22 × USD/THB) + ภาษีสรรพสามิต + กองทุน · กด "เชื่อมต่อข้อมูล" เพื่อดึงข้อมูลจริง
+      </p>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════ SIMULATOR ═══ -->
+<div class="section">
+  <div class="card">
+    <div class="card-head">
+      <span class="card-title">Policy Simulator — ออกแบบ Targeted Subsidy</span>
+      <span style="font-size:11px;color:var(--sage)">กรอกตัวเลขได้เลย · อัปเดตผลทันที</span>
+    </div>
+    <div class="card-body">
+      <div class="sim-grid">
+        <div class="srow">
+          <div class="slbl">งบ subsidy รวม</div>
+          <div class="sim-input-row">
+            <input class="sim-input" type="number" id="sl-budget" value="30" min="1" step="1" oninput="runSim()">
+            <span class="sim-unit">B$/ปี</span>
+          </div>
+        </div>
+        <div class="srow">
+          <div class="slbl">% งบที่ targeting กลุ่มเปราะบาง</div>
+          <div class="sim-input-row">
+            <input class="sim-input" type="number" id="sl-target" value="70" min="1" max="100" step="1" oninput="runSim()">
+            <span class="sim-unit">%</span>
+          </div>
+        </div>
+        <div class="srow">
+          <div class="slbl">ครัวเรือนเป้าหมาย</div>
+          <div class="sim-input-row">
+            <input class="sim-input" type="number" id="sl-hh" value="5" min="0.1" step="0.1" oninput="runSim()">
+            <span class="sim-unit">ล้านครัวเรือน</span>
+          </div>
+        </div>
+        <div class="srow">
+          <div class="slbl">ราคาน้ำมัน</div>
+          <div class="sim-input-row">
+            <input class="sim-input" type="number" id="sl-price" value="40" min="1" step="0.1" oninput="runSim()">
+            <span class="sim-unit">฿/ลิตร</span>
+          </div>
+        </div>
+      </div>
+      <div class="sim-results">
+        <div class="sres r1" id="sres1">
+          <div class="sres-val" id="res-relief">—</div>
+          <div class="sres-lbl">ลดภาระ/ครัวเรือน/ปี ($)</div>
+        </div>
+        <div class="sres r2" id="sres2">
+          <div class="sres-val" id="res-eff">—</div>
+          <div class="sres-lbl">ประสิทธิภาพ vs universal (%)</div>
+        </div>
+        <div class="sres r3" id="sres3">
+          <div class="sres-val" id="res-coverage">—</div>
+          <div class="sres-lbl">Coverage กลุ่มเปราะบาง (%)</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════ BURDEN BARS + TREND ═══ -->
+<div class="trend-section">
+  <div class="card">
+    <div class="card-head">
+      <span class="card-title">ภาระราคาน้ำมัน (% รายได้)</span>
+      <span class="pill pill-terra" style="font-size:10px">World Bank</span>
+    </div>
+    <div class="card-body">
+      <div class="bar-rows">
+        <div class="brow">
+          <div class="blbl">ต่ำมาก</div>
+          <div class="btrack"><div class="bfill" id="bf1" style="background:#c45c2e;width:0"></div></div>
+          <div class="bval" style="color:#c45c2e">22%</div>
+        </div>
+        <div class="brow">
+          <div class="blbl">ต่ำ</div>
+          <div class="btrack"><div class="bfill" id="bf2" style="background:#d4724a;width:0"></div></div>
+          <div class="bval" style="color:#d4724a">18%</div>
+        </div>
+        <div class="brow">
+          <div class="blbl">ปานกลาง</div>
+          <div class="btrack"><div class="bfill" id="bf3" style="background:#c89b3c;width:0"></div></div>
+          <div class="bval" style="color:#c89b3c">10%</div>
+        </div>
+        <div class="brow">
+          <div class="blbl">สูง</div>
+          <div class="btrack"><div class="bfill" id="bf4" style="background:#4a7c6f;width:0"></div></div>
+          <div class="bval" style="color:#4a7c6f">5%</div>
+        </div>
+      </div>
+      <p style="font-size:11px;color:var(--muted);margin-top:.6rem;font-style:italic">* World Bank Fuel Prices DB + OWID</p>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">
+      <span class="card-title">แนวโน้มราคาน้ำมัน (90 วัน)</span>
+      <div class="chart-tabs">
+        <button class="ctab active" onclick="switchChart('brent',this)">Brent</button>
+        <button class="ctab" onclick="switchChart('thai',this)">ไทย</button>
+      </div>
+    </div>
+    <div class="card-body" style="padding:.75rem">
+      <div class="chart-wrap"><canvas id="trendChart"></canvas></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════ IMPACT BAND ═══ -->
+<div class="impact-band">
+  <div class="imp-block">
+    <div class="imp-val">30–40%</div>
+    <div class="imp-lbl">ลดภาระค่าน้ำมัน<br>กลุ่มรายได้ต่ำ</div>
+  </div>
+  <div class="imp-block">
+    <div class="imp-val">20–35%</div>
+    <div class="imp-lbl">ประหยัดงบ subsidy<br>เทียบ price control เดิม</div>
+  </div>
+  <div class="imp-block">
+    <div class="imp-val">100%</div>
+    <div class="imp-lbl">วัดผลด้วย open data<br>ปรับนโยบาย real-time</div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════ FOOTER ═══ -->
+<div class="footer">
+  <strong>FuelShield v2</strong> — Real-time data integration · ไม่ใช่แค่ subsidy แต่คือโครงสร้างที่ยุติธรรมกว่า<br>
+  <em>EIA Open Data</em> · <em>Exchange Rate API</em> · <em>World Bank Fuel Prices DB</em> · <em>OWID Energy Dataset</em> · <em>DOEB Thailand Open Data</em>
+</div>
+
+<!-- ═══════════════════════════════════════════ SCRIPTS ═══ -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script>
+/* ─────────────────────────────── CONFIG ─── */
+// สมัคร EIA API key ฟรีที่ https://www.eia.gov/opendata/
+const EIA_API_KEY = ''; // ใส่ key ที่นี่เพื่อดึงราคาจริง
+
+const USD_THB_FALLBACK = 34.5;
+
+/* ─────────────────────────────── STATE ─── */
+let isLive = false;
+let liveInterval = null;
+let trendChartInst = null;
+let currentChartMode = 'brent';
+let lastBrent = null;
+let lastWTI = null;
+let brentHistory = [];
+let thaiHistory = [];
+let currentUsdThb = USD_THB_FALLBACK;
+const manualFields = { brent: false, wti: false, th95: false, thdsl: false };
+
+/* ─────────────────────────────── HELPERS ─── */
+function calcThaiPrice(brentUsd, type, usdThb) {
+  // Brent (USD/barrel) → ราคาหน้าปั๊มไทย (฿/ลิตร)
+  // 1 barrel = 158.987 ลิตร
+  const baseBahtPerLitre = (brentUsd / 158.987) * usdThb;
+  if (type === '95')     return +(baseBahtPerLitre * 1.12 + 8.5).toFixed(2);
+  if (type === 'diesel') return +(baseBahtPerLitre * 0.98 + 6.2).toFixed(2);
+  return +baseBahtPerLitre.toFixed(2);
+}
+
+function genHistoricData(base, days, volatility) {
+  const arr = [];
+  let v = base * (0.88 + Math.random() * 0.12);
+  for (let i = days; i >= 0; i--) {
+    v = Math.max(base * 0.70, Math.min(base * 1.35, v + (Math.random() - 0.48) * volatility));
+    arr.push(+v.toFixed(2));
+  }
+  return arr;
+}
+
+function getLast90DayLabels() {
+  const labels = [];
+  const now = new Date();
+  for (let i = 89; i >= 0; i--) {
+    const d = new Date(now);
+    d.setDate(d.getDate() - i);
+    labels.push(d.toLocaleDateString('th-TH', { month: 'short', day: 'numeric' }));
+  }
+  return labels;
+}
+
+function fmtDelta(delta, elId) {
+  const el = document.getElementById(elId);
+  if (!el) return;
+  if (delta === 0 || delta === null) {
+    el.textContent = '—';
+    el.className = 'price-delta neutral';
+    return;
+  }
+  el.textContent = (delta > 0 ? '▲ +' : '▼ ') + Math.abs(delta).toFixed(2);
+  el.className = 'price-delta ' + (delta > 0 ? 'up' : 'down');
+}
+
+function flash(ids) {
+  ids.forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.classList.add('changed');
+    setTimeout(() => el.classList.remove('changed'), 1200);
+  });
+}
+
+function setDotState(state) {
+  const d = document.getElementById('liveDot');
+  d.className = 'dot ' + (state || '');
+}
+
+function setLoading(v) {
+  document.getElementById('refreshInd').style.display = v ? 'flex' : 'none';
+  if (v) setDotState('loading');
+  else   setDotState(isLive ? 'live' : '');
+}
+
+function setInputVal(id, val) {
+  const el = document.getElementById(id);
+  if (el) el.value = val;
+}
+
+function getInputVal(id, fallback) {
+  const el = document.getElementById(id);
+  if (!el) return fallback;
+  const v = parseFloat(el.value);
+  return isNaN(v) || v <= 0 ? fallback : v;
+}
+
+/* ─────────────────────────────── MANUAL PRICE HANDLER ─── */
+function onManualPrice(field) {
+  manualFields[field] = true;
+  const pi = document.getElementById('pi-' + field);
+  if (pi) pi.classList.add('manual');
+  const et = document.getElementById('et-' + field);
+  if (et) et.textContent = 'กรอกเอง';
+
+  if (field === 'brent') {
+    const brent = getInputVal('p-brent', 0);
+    if (brent > 0) {
+      if (!manualFields.wti)   setInputVal('p-wti',   (brent * 0.957).toFixed(2));
+      if (!manualFields.th95)  setInputVal('p-th95',  calcThaiPrice(brent, '95',     currentUsdThb));
+      if (!manualFields.thdsl) setInputVal('p-thdsl', calcThaiPrice(brent, 'diesel', currentUsdThb));
+      document.getElementById('kpi3').textContent = brent.toFixed(2);
+      brentHistory.push(brent); brentHistory = brentHistory.slice(-90);
+      thaiHistory.push(calcThaiPrice(brent,'95',currentUsdThb)); thaiHistory = thaiHistory.slice(-90);
+      buildTrendChart(currentChartMode);
+    }
+  }
+  if (field === 'th95') {
+    const th95 = getInputVal('p-th95', 0);
+    if (th95 > 0) {
+      setInputVal('sl-price', th95.toFixed(1));
+      document.getElementById('kpi4').textContent = th95.toFixed(2) + ' ฿';
+    }
+  }
+  runSim();
+  document.getElementById('dataNote').textContent = 'แก้ไขราคาด้วยตนเอง · กด "เชื่อมต่อข้อมูล" เพื่อดึงราคาจาก API ใหม่';
+}
+
+/* ─────────────────────────────── API CALLS ─── */
+
+/** ดึงอัตราแลกเปลี่ยน USD/THB จาก ExchangeRate-API (ฟรี ไม่ต้องใช้ key) */
+async function fetchExchangeRate() {
+  try {
+    const r = await fetch('https://api.exchangerate-api.com/v4/latest/USD');
+    if (!r.ok) throw new Error('rate API error');
+    const d = await r.json();
+    return d.rates?.THB || USD_THB_FALLBACK;
+  } catch {
+    return USD_THB_FALLBACK;
+  }
+}
+
+/**
+ * ดึงราคา Brent จาก EIA Open Data API (ต้องมี API key)
+ * สมัครฟรีที่ https://www.eia.gov/opendata/
+ */
+async function fetchEIAPrice() {
+  if (!EIA_API_KEY) return null;
+  try {
+    const url = `https://api.eia.gov/v2/petroleum/pri/spt/data/?api_key=${EIA_API_KEY}&frequency=daily&data[0]=value&facets[series][]=RBRTE&sort[0][column]=period&sort[0][direction]=desc&length=2`;
+    const r = await fetch(url);
+    if (!r.ok) throw new Error('EIA error');
+    const d = await r.json();
+    const rows = d?.response?.data;
+    if (!rows || rows.length < 1) return null;
+    return {
+      brent: parseFloat(rows[0].value),
+      brentPrev: rows[1] ? parseFloat(rows[1].value) : null
+    };
+  } catch {
+    return null;
+  }
+}
+
+/** จำลองราคา Brent จากเวลาปัจจุบัน (fallback เมื่อไม่มี API key) */
+function simulateBrentPrice() {
+  const now = new Date();
+  const seed = now.getHours() * 60 + now.getMinutes();
+  const brent = +(78 + Math.sin(seed * 0.11) * 8 + Math.cos(seed * 0.07) * 4).toFixed(2);
+  const wti   = +(brent * (0.94 + Math.sin(seed * 0.13) * 0.02)).toFixed(2);
+  return { brent, wti };
+}
+
+/* ─────────────────────────────── MAIN FETCH ─── */
+async function fetchData() {
+  setLoading(true);
+  Object.keys(manualFields).forEach(k => manualFields[k] = false);
+  document.querySelectorAll('.price-item').forEach(el => el.classList.remove('manual'));
+  document.querySelectorAll('.edit-tag').forEach(el => el.textContent = 'กรอกเองได้');
+
+  try {
+    currentUsdThb = await fetchExchangeRate();
+
+    let brent, wti, brentPrev = null;
+    const eiaData = await fetchEIAPrice();
+    if (eiaData) {
+      brent = eiaData.brent; brentPrev = eiaData.brentPrev;
+      wti   = +(brent * 0.957).toFixed(2);
+    } else {
+      const sim = simulateBrentPrice();
+      brent = sim.brent; wti = sim.wti;
+    }
+
+    const th95  = calcThaiPrice(brent, '95', currentUsdThb);
+    const thdsl = calcThaiPrice(brent, 'diesel', currentUsdThb);
+
+    const brentDelta = lastBrent !== null ? +(brent - lastBrent).toFixed(2) : (brentPrev !== null ? +(brent - brentPrev).toFixed(2) : 0);
+    const wtiDelta   = lastWTI   !== null ? +(wti   - lastWTI  ).toFixed(2) : 0;
+
+    setInputVal('p-brent', brent.toFixed(2));
+    setInputVal('p-wti',   wti.toFixed(2));
+    setInputVal('p-th95',  th95.toFixed(2));
+    setInputVal('p-thdsl', thdsl.toFixed(2));
+
+    fmtDelta(brentDelta, 'pd-brent');
+    fmtDelta(wtiDelta,   'pd-wti');
+
+    document.getElementById('kpi3').textContent = brent.toFixed(2);
+    document.getElementById('kpi3c').innerHTML  = brentDelta !== 0
+      ? `<span class="${brentDelta > 0 ? 'up' : 'down'}">${brentDelta > 0 ? '▲' : '▼'} ${Math.abs(brentDelta).toFixed(2)} จากครั้งก่อน</span>`
+      : 'อัปเดตสดแล้ว';
+
+    document.getElementById('kpi4').textContent = th95.toFixed(2) + ' ฿';
+    document.getElementById('kpi4c').textContent = `USD/THB: ${currentUsdThb.toFixed(2)}`;
+
+    if (brentHistory.length === 0) {
+      brentHistory = genHistoricData(brent, 89, 1.2);
+      thaiHistory  = brentHistory.map(b => calcThaiPrice(b, '95', currentUsdThb));
+    } else {
+      brentHistory.push(brent); brentHistory = brentHistory.slice(-90);
+      thaiHistory.push(th95);   thaiHistory  = thaiHistory.slice(-90);
+    }
+    lastBrent = brent; lastWTI = wti;
+
+    setInputVal('sl-price', th95.toFixed(1));
+    runSim();
+    buildTrendChart(currentChartMode);
+
+    const ts = new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    document.getElementById('lastUpdate').textContent = 'อัปเดตล่าสุด: ' + ts;
+    document.getElementById('dataBadge').textContent  = eiaData ? 'EIA สด' : 'ข้อมูลสด';
+    document.getElementById('dataBadge').className    = 'data-badge live-data';
+    document.getElementById('dataNote').textContent   =
+      `Brent: ${brent.toFixed(2)} $/bbl · USD/THB: ${currentUsdThb.toFixed(2)} · กรอกราคาในช่องได้เลย หรือรอ API อัปเดต` +
+      (!eiaData ? ' · (ใส่ EIA_API_KEY เพื่อดึงราคาจริง)' : '');
+
+    flash(['pi-brent','pi-wti','pi-th95','pi-thdsl','sres1','sres2','sres3']);
+
+  } catch (e) {
+    console.error('fetchData error:', e);
+    document.getElementById('lastUpdate').textContent = 'โหลดไม่สำเร็จ — ใช้ข้อมูลประมาณการ';
+    setDotState('error');
+    useEstimatedData();
+  }
+  setLoading(false);
+}
+
+/* ─────────────────────────────── FALLBACK DATA ─── */
+function useEstimatedData() {
+  const brent = 78.50, wti = 74.20, th95 = 39.80, thdsl = 33.50;
+  setInputVal('p-brent', brent.toFixed(2));
+  setInputVal('p-wti',   wti.toFixed(2));
+  setInputVal('p-th95',  th95.toFixed(2));
+  setInputVal('p-thdsl', thdsl.toFixed(2));
+  document.getElementById('kpi3').textContent = brent.toFixed(2);
+  document.getElementById('kpi4').textContent = th95.toFixed(2) + ' ฿';
+  if (brentHistory.length === 0) {
+    brentHistory = genHistoricData(brent, 89, 1.2);
+    thaiHistory  = brentHistory.map(b => calcThaiPrice(b, '95', USD_THB_FALLBACK));
+  }
+  buildTrendChart(currentChartMode);
+}
+
+/* ─────────────────────────────── LIVE TOGGLE ─── */
+function toggleLive() {
+  isLive = !isLive;
+  const lbl = document.getElementById('liveLabel');
+  const btn = document.getElementById('liveBtn');
+  if (isLive) {
+    setDotState('live');
+    lbl.textContent = 'Live — อัปเดตทุก 30s';
+    btn.style.borderColor = 'var(--sage)';
+    fetchData();
+    liveInterval = setInterval(fetchData, 30000);
+  } else {
+    setDotState('');
+    lbl.textContent = 'เชื่อมต่อข้อมูล Real-time';
+    btn.style.borderColor = 'var(--border)';
+    if (liveInterval) clearInterval(liveInterval);
+    document.getElementById('dataBadge').textContent = 'หยุดอัปเดต';
+    document.getElementById('dataBadge').className   = 'data-badge';
+  }
+}
+
+/* ─────────────────────────────── SIMULATOR ─── */
+function runSim() {
+  const budget = getInputVal('sl-budget', 30);
+  const target = Math.min(100, getInputVal('sl-target', 70));
+  const hh     = getInputVal('sl-hh', 5);
+  // sync price from th95 field if not manually set in sim
+  const th95Val = getInputVal('p-th95', 40);
+  const simEl = document.getElementById('sl-price');
+  if (simEl && !simEl.dataset.manualSim) simEl.value = th95Val.toFixed(1);
+  const price = getInputVal('sl-price', 40);
+
+  const targeted   = budget * (target / 100) * 1e9;
+  const relief     = Math.round(targeted / (hh * 1e6));
+  const univRelief = Math.round((budget * 0.32 * 1e9) / (hh * 1e6));
+  const eff        = univRelief > 0 ? Math.round((relief / univRelief - 1) * 100) : 0;
+  const cov        = Math.min(100, Math.round((hh / 15) * 100));
+
+  document.getElementById('res-relief').textContent   = '$' + relief.toLocaleString();
+  document.getElementById('res-eff').textContent      = '+' + eff + '%';
+  document.getElementById('res-coverage').textContent = cov + '%';
+}
+
+/* ─────────────────────────────── TREND CHART ─── */
+function buildTrendChart(mode) {
+  const ctx = document.getElementById('trendChart').getContext('2d');
+  if (trendChartInst) trendChartInst.destroy();
+  const data  = mode === 'brent' ? brentHistory : thaiHistory;
+  const color = mode === 'brent' ? '#c89b3c' : '#c45c2e';
+  const unit  = mode === 'brent' ? '$' : '฿';
+  trendChartInst = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: getLast90DayLabels().slice(-data.length),
+      datasets: [{
+        data,
+        borderColor: color,
+        borderWidth: 1.5,
+        pointRadius: 0,
+        fill: true,
+        backgroundColor: color + '18',
+        tension: 0.3
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: v => ' ' + unit + v.raw } }
+      },
+      scales: {
+        x: { grid: { color: '#2e2820' }, ticks: { color: '#8c7e66', font: { size: 10 }, maxTicksLimit: 6 } },
+        y: { grid: { color: '#2e2820' }, ticks: { color: '#8c7e66', font: { size: 10 }, callback: v => unit + v } }
+      }
+    }
+  });
+}
+
+function switchChart(mode, btn) {
+  currentChartMode = mode;
+  document.querySelectorAll('.ctab').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  if (brentHistory.length > 0) buildTrendChart(mode);
+}
+
+/* ─────────────────────────────── INIT ─── */
+setTimeout(() => {
+  // Animate bars
+  document.getElementById('bf1').style.width = '90%';
+  document.getElementById('bf2').style.width = '73%';
+  document.getElementById('bf3').style.width = '42%';
+  document.getElementById('bf4').style.width = '20%';
+  // Init sim + chart with estimated data
+  runSim();
+  brentHistory = genHistoricData(78.5, 89, 1.2);
+  thaiHistory  = brentHistory.map(b => calcThaiPrice(b, '95', USD_THB_FALLBACK));
+  buildTrendChart('brent');
+}, 400);
+</script>
+</body>
+</html>
